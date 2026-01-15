@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>碳匯大富翁 (4人版) - 網頁版</title>
+
+  <!-- 離線可用：不依賴任何外部 CDN（避免「開始遊戲沒反應」） -->
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap");
+    body { font-family: "Noto Sans TC", sans-serif; margin:0; background:#f0fdfa; color:#0f172a; }
+    * { box-sizing: border-box; }
+
+    .app { min-height: 100vh; padding: 12px; }
+    .layout { display:flex; gap:16px; max-width: 1280px; margin: 0 auto; align-items: stretch; }
+    @media (max-width: 1100px){ .layout{ flex-direction: column; } }
+
+    /* Left legend */
+    .legend { width: 260px; background:#fff; border-radius:16px; box-shadow:0 10px 30px rgba(0,0,0,.08); padding:14px; border:1px solid #e2e8f0; }
+    .legend h3{ margin:0 0 10px 0; font-size:14px; color:#0f766e; }
+    .legend-item{ display:flex; gap:10px; align-items:center; padding:8px 10px; border-radius:12px; background:#f8fafc; margin-bottom:8px; border:1px solid #eef2f7; }
+    .dot{ width:10px; height:10px; border-radius:999px; }
+    .dot.go{ background:#fb7185; }
+    .dot.safe{ background:#22c55e; }
+    .dot.forest{ background:#22c55e; }
+    .dot.ocean{ background:#3b82f6; }
+    .dot.soil{ background:#a855f7; }
+    .dot.tech{ background:#eab308; }
+    .dot.event{ background:#38bdf8; }
+    .dot.tax{ background:#94a3b8; }
+    .legend-item .t{ font-weight:800; font-size:12px; }
+    .legend-item .d{ font-size:11px; color:#475569; }
+
+    /* Board */
+    .board-wrap{ flex:1; display:flex; justify-content:center; }
+    .game-board {
+      display:grid;
+      grid-template-columns: repeat(6, 1fr);
+      grid-template-rows: repeat(6, 1fr);
+      gap: 4px;
+      width: 100%;
+      max-width: 700px;
+      aspect-ratio: 1 / 1;
+      margin: 0 auto;
+      position: relative;
+      user-select: none;
+      padding: 4px;
+      background:#fff;
+      border-radius: 14px;
+      box-shadow: 0 16px 40px rgba(0,0,0,.12);
+    }
+
+    .tile {
+      border: 2px solid #cbd5e1;
+      border-bottom: 6px solid transparent;
+      background: white;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      font-size: 12px;
+      text-align:center;
+      padding: 4px;
+      position: relative;
+      border-radius: 8px;
+      transition: transform .12s, box-shadow .12s, border-color .12s;
+      overflow:hidden;
+    }
+
+    .tile .type-badge{
+      position:absolute; left:6px; top:6px;
+      font-size:10px; font-weight:900;
+      padding:2px 6px; border-radius:999px;
+      background:#f1f5f9; color:#334155;
+      border:1px solid #e2e8f0;
+    }
+
+    .tile.highlight{
+      border-color:#0f766e;
+      box-shadow: 0 0 0 3px rgba(13,148,136,.25);
+      transform: translateY(-1px);
+    }
+
+    .owner-strip{ position:absolute; top:0; left:0; right:0; height:4px; }
+
+    /* Lv badge */
+    .lv-badge{
+      position:absolute; top:6px; right:6px;
+      font-size:10px; font-weight:900;
+      padding:2px 6px; border-radius:8px;
+      background:#0f172a; color:#fff;
+      box-shadow:0 4px 10px rgba(0,0,0,.15);
+    }
+
+    /* Token container */
+    .token-container{
+      position:absolute; inset:4px;
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+      gap:2px;
+      pointer-events:none;
+    }
+    .slot{ display:flex; }
+    .p0{ align-items:flex-start; justify-content:flex-start; }
+    .p1{ align-items:flex-start; justify-content:flex-end; }
+    .p2{ align-items:flex-end; justify-content:flex-start; }
+    .p3{ align-items:flex-end; justify-content:flex-end; }
+
+    /* Flag token (四根旗子) */
+    .flag{
+      width: 16px; height: 16px;
+      position: relative;
+      filter: drop-shadow(0 2px 2px rgba(0,0,0,.25));
+    }
+    .flag:before{
+      content:"";
+      position:absolute; left:2px; top:2px;
+      width: 3px; height: 12px; background:#0f172a;
+      border-radius:2px;
+    }
+    .flag:after{
+      content:"";
+      position:absolute; left:5px; top:3px;
+      width: 0; height: 0;
+      border-top: 5px solid transparent;
+      border-bottom: 5px solid transparent;
+      border-left: 9px solid var(--c);
+    }
+
+    /* Center panel */
+    .center-panel{
+      grid-column: 2 / 6;
+      grid-row: 2 / 6;
+      background: #f0fdfa;
+      border-radius: 10px;
+      padding: 8px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .card{ background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:10px; box-shadow:0 8px 18px rgba(0,0,0,.06); }
+    .row{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .pill{ font-size:12px; background:#f1f5f9; padding:4px 8px; border-radius:999px; color:#334155; }
+    .btn{
+      border:none; cursor:pointer;
+      font-weight:900;
+      padding: 10px 18px;
+      border-radius: 999px;
+      box-shadow:0 10px 20px rgba(0,0,0,.12);
+      transition: transform .08s, filter .12s, opacity .12s;
+    }
+    .btn:active{ transform: scale(.98); }
+    .btn.primary{ background:#f43f5e; color:#fff; }
+    .btn.primary:disabled{ opacity:.5; cursor:not-allowed; }
+    .btn.ghost{ background:#e2e8f0; color:#334155; }
+    .btn.blue{ background:#2563eb; color:#fff; border-radius:12px; padding:10px 12px; }
+    .btn.green{ background:#16a34a; color:#fff; border-radius:12px; padding:10px 12px; }
+    .btn.yellow{ background:#eab308; color:#111827; border-radius:12px; padding:10px 12px; }
+
+    .dice{ width:64px; height:64px; border:3px solid #0f172a; border-radius:14px; background:#fff;
+      display:flex; align-items:center; justify-content:center; position:relative; }
+    .dice.rolling{ animation: diceShake .38s infinite; }
+    @keyframes diceShake{ 0%{transform:rotate(0)}25%{transform:rotate(8deg)}50%{transform:rotate(-8deg)}100%{transform:rotate(0)} }
+    .pip{ width:10px; height:10px; background:#0f172a; border-radius:999px; position:absolute; opacity:0; }
+    .p1{top:14px;left:14px}.p2{top:14px;left:27px}.p3{top:14px;left:40px}
+    .p4{top:27px;left:14px}.p5{top:27px;left:27px}.p6{top:27px;left:40px}
+    .p7{top:40px;left:14px}.p8{top:40px;left:27px}.p9{top:40px;left:40px}
+    .face-1 .p5{opacity:1}
+    .face-2 .p1,.face-2 .p9{opacity:1}
+    .face-3 .p1,.face-3 .p5,.face-3 .p9{opacity:1}
+    .face-4 .p1,.face-4 .p3,.face-4 .p7,.face-4 .p9{opacity:1}
+    .face-5 .p1,.face-5 .p3,.face-5 .p5,.face-5 .p7,.face-5 .p9{opacity:1}
+    .face-6 .p1,.face-6 .p3,.face-6 .p4,.face-6 .p6,.face-6 .p7,.face-6 .p9{opacity:1}
+    .log{ height: 110px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius: 12px; padding: 8px; color:#475569; }
+    .log div{ padding: 4px 0; border-bottom:1px solid #eef2f7; }
+    .log div:last-child{ border-bottom:none; }
+
+    /* Right dashboard */
+    .dash{ width: 360px; display:flex; flex-direction:column; gap:12px; }
+    @media (max-width: 1100px){ .dash{ width: 100%; } }
+    .bar{ height: 10px; background:#e2e8f0; border-radius:999px; overflow:hidden; }
+    .bar > div{ height:100%; background: linear-gradient(90deg,#facc15,#f43f5e); width: 30%; transition: width .6s; }
+    .players{ display:grid; grid-template-columns: 1fr; gap:10px; overflow:auto; }
+    @media (max-width: 700px){ .players{ grid-template-columns: 1fr; } }
+    .p-card{ background:#fff; border-radius:16px; padding:12px; border:1px solid #e2e8f0; box-shadow:0 8px 18px rgba(0,0,0,.06); }
+    .p-card.active{ outline: 3px solid rgba(13,148,136,.35); transform: translateY(-1px); }
+
+    /* Modal */
+    .overlay{
+      position:fixed; inset:0;
+      background: rgba(15,23,42,.78);
+      display:flex; align-items:center; justify-content:center;
+      z-index: 50;
+      backdrop-filter: blur(6px);
+      padding: 16px;
+    }
+    .modal{
+      width: min(520px, 92vw);
+      background:#fff;
+      border-radius: 22px;
+      padding: 22px;
+      border: 4px solid #14b8a6;
+      box-shadow: 0 30px 90px rgba(0,0,0,.35);
+      text-align:center;
+    }
+    .modal h1{ margin:0; font-size: 40px; color:#0f766e; }
+    .modal p{ margin: 6px 0 16px; color:#64748b; }
+    select{
+      width:100%; padding: 12px 12px;
+      border-radius: 12px; border:1px solid #cbd5e1;
+      font-size: 16px; outline:none;
+    }
+    select:focus{ border-color:#14b8a6; box-shadow: 0 0 0 3px rgba(20,184,166,.18); }
+    .start-btn{
+      width:100%;
+      margin-top: 14px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      border:none;
+      background:#0f766e;
+      color:#fff;
+      font-weight: 900;
+      font-size: 18px;
+      cursor:pointer;
+      box-shadow:0 16px 30px rgba(15,118,110,.25);
+      transition: transform .08s, filter .12s;
+    }
+    .start-btn:active{ transform: scale(.98); }
+
+    /* Action overlay inside center panel */
+    .action-overlay{
+      position:absolute; inset: 8px;
+      background: rgba(255,255,255,.94);
+      border:1px solid #e2e8f0;
+      border-radius: 14px;
+      box-shadow: inset 0 0 0 2px rgba(226,232,240,.6);
+      display:flex; flex-direction:column; gap:10px;
+      align-items:center; justify-content:center;
+      padding: 14px;
+    }
+    .action-overlay .title{ font-size: 20px; font-weight: 900; }
+    .action-overlay .desc{ font-size: 13px; color:#475569; line-height: 1.5; max-width: 420px; }
+    .action-overlay .actions{ width: 100%; max-width: 420px; display:flex; flex-direction:column; gap:8px; }
+
+    /* End game fixed button */
+    .end-btn{
+      position: fixed; left: 16px; bottom: 16px;
+      z-index: 60;
+      background:#dc2626; color:#fff;
+      font-weight: 900; border:none;
+      padding: 10px 12px; border-radius: 12px;
+      cursor:pointer; box-shadow:0 12px 24px rgba(0,0,0,.18);
+    }
+    .end-btn:active{ transform: scale(.98); }
+  
+    /* Tile Type Color Strips (保留地塊底下顏色) */
+    /* GO / Safe */
+    .tile-go   { background: #ffe4e6; color: #be123c; }
+    .tile-safe { background: #ecfeff; color: #0e7490; }
+    /* Backward compat (older builds used start for GO/safe) */
+    .tile-start { background: #ffe4e6; color: #be123c; }
+    .tile-forest { border-bottom-color: #22c55e; }
+    .tile-ocean  { border-bottom-color: #3b82f6; }
+    .tile-soil   { border-bottom-color: #a855f7; }
+    .tile-tech   { border-bottom-color: #eab308; }
+    .tile-event  { background: #e0f2fe; color: #0369a1; }
+    .tile-tax    { background: #f1f5f9; color: #475569; }
+
+    /* Settlement animation + medals */
+    @keyframes settlePop{0%{transform:translateY(10px) scale(.98);opacity:0}100%{transform:translateY(0) scale(1);opacity:1}}
+    @keyframes medalDrop{0%{transform:translateY(-10px) rotate(-8deg);opacity:0}100%{transform:translateY(0) rotate(0);opacity:1}}
+    @keyframes shine{0%{transform:translateX(-120%) rotate(12deg);opacity:0}25%{opacity:.25}100%{transform:translateX(220%) rotate(12deg);opacity:0}}
+    .settle-item{ animation: settlePop .28s ease-out both; }
+    .medal{ width:40px; height:40px; border-radius:999px; display:flex; align-items:center; justify-content:center; font-weight:900; box-shadow:0 6px 14px rgba(0,0,0,.12); animation: medalDrop .35s ease-out both; }
+    .gold-medal{ background:linear-gradient(135deg,#fbbf24,#fde68a,#f59e0b); color:#7c2d12; position:relative; overflow:hidden; }
+    .gold-medal:after{ content:""; position:absolute; top:-20%; left:-40%; width:40%; height:140%; background:rgba(255,255,255,.55); filter:blur(2px); transform:rotate(12deg); animation:shine 1.6s ease-in-out .2s infinite; }
+    .silver-medal{ background:linear-gradient(135deg,#e5e7eb,#f9fafb,#9ca3af); color:#111827; }
+    .bronze-medal{ background:linear-gradient(135deg,#f59e0b,#fcd34d,#b45309); color:#7c2d12; }
+</style>
+</head>
+
+<body>
+<div class="app" id="app">
+
+  <!-- Setup Modal -->
+  <div class="overlay" id="setupOverlay">
+    <div class="modal">
+      <h1>碳匯大富翁</h1>
+      <p>模擬碳信用抵換與自然解方（網頁版）</p>
+
+      <div style="text-align:left; background:#f8fafc; border:1px solid #e2e8f0; padding:12px; border-radius:14px;">
+        <div style="font-weight:900; margin-bottom:8px; color:#334155;">選擇真人玩家人數（總人數 4 人）</div>
+        <select id="humanCount">
+          <option value="1">1 位真人（3 位電腦）</option>
+          <option value="2">2 位真人（2 位電腦）</option>
+          <option value="3">3 位真人（1 位電腦）</option>
+          <option value="4">4 位真人（無電腦）</option>
+        </select>
+      </div>
+
+      <button class="start-btn" id="btnStart">開始遊戲 🚀</button>
+      <div id="setupHint" style="margin-top:10px; font-size:12px; color:#94a3b8;"></div>
+    </div>
+  </div>
+
+  <div class="layout" id="gameLayout" style="display:none;">
+    <!-- Legend -->
+    <aside class="legend">
+      <h3>地塊圖例</h3>
+      <div class="legend-item"><span class="dot go"></span><div><div class="t">起點</div><div class="d">超過起點才拿補助金</div></div></div>
+      <div class="legend-item"><span class="dot safe"></span><div><div class="t">安全區</div><div class="d">停留不觸發事件</div></div></div>
+      <div class="legend-item"><span class="dot forest"></span><div><div class="t">森林</div><div class="d">自然碳匯（可買可升級）</div></div></div>
+      <div class="legend-item"><span class="dot ocean"></span><div><div class="t">海洋</div><div class="d">藍碳資產（可買可升級）</div></div></div>
+      <div class="legend-item"><span class="dot soil"></span><div><div class="t">土壤</div><div class="d">農法 / 土壤碳（可買可升級）</div></div></div>
+      <div class="legend-item"><span class="dot tech"></span><div><div class="t">科技</div><div class="d">減碳科技（可買可升級）</div></div></div>
+      <div class="legend-item"><span class="dot event"></span><div><div class="t">機會 / 命運</div><div class="d">隨機事件（影響資金/升溫/碳權）</div></div></div>
+      <div class="legend-item"><span class="dot tax"></span><div><div class="t">碳稅 / 關稅</div><div class="d">繳費（碳權可抵扣）</div></div></div>
+
+      <div style="margin-top:12px; font-size:12px; color:#64748b; line-height:1.5;">
+        <b>升級上限：</b>Lv.5（倍率每級 +10%）<br>
+        <b>補助金規則：</b>「超過起點」才給；剛好停在起點不給
+      </div>
+    </aside>
+
+    <!-- Board -->
+    <div class="board-wrap">
+      <div class="game-board" id="boardGrid">
+        <!-- tiles injected by JS -->
+        <div class="center-panel" id="centerPanel">
+          <div class="card row">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span style="font-size:12px; color:#64748b;">當前回合:</span>
+              <div style="display:flex; align-items:center; gap:6px; font-weight:900;" id="turnIndicator"></div>
+            </div>
+            <div class="pill" id="roundIndicator">第 1 輪</div>
+          </div>
+
+          <div class="card" style="flex:1; position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center;">
+            <div class="dice face-1" id="diceDisplay" aria-label="dice"><span class="pip p1"></span><span class="pip p2"></span><span class="pip p3"></span><span class="pip p4"></span><span class="pip p5"></span><span class="pip p6"></span><span class="pip p7"></span><span class="pip p8"></span><span class="pip p9"></span></div>
+            <button class="btn primary" id="btnRoll">擲骰子 🎲</button>
+
+            <div class="action-overlay" id="actionOverlay" style="display:none;">
+              <div class="title" id="actionTitle"></div>
+              <div class="desc" id="actionDesc"></div>
+              <div class="actions" id="actionButtons"></div>
+            </div>
+          </div>
+
+          <div class="log" id="logBox"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right dashboard -->
+    <aside class="dash">
+      <div class="p-card">
+        <div class="row" style="margin-bottom:8px;">
+          <div style="font-weight:900; color:#334155;">🌍 全球升溫監控</div>
+          <div id="tempLabel" style="font-weight:900;"></div>
+        </div>
+        <div class="bar"><div id="tempBar"></div></div>
+        <div style="font-size:11px; color:#94a3b8; text-align:right; margin-top:6px;">升溫至 2.0°C 遊戲即失敗</div>
+      </div>
+
+      <div class="players" id="playerCards"></div>
+    </aside>
+  </div>
+
+  <!-- Settlement Overlay (第15輪結算) -->
+  <div class="overlay" id="settlementOverlay" style="display:none;">
+    <div class="modal" style="max-width:620px;">
+      <h1 style="margin-bottom:6px;">📊 回合結算</h1>
+      <p id="settleSub" style="margin-top:0;">遊戲已到第 15 輪，開始結算排名。</p>
+
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; background:#f8fafc; border:1px solid #e2e8f0; padding:10px 12px; border-radius:14px; margin-top:12px;">
+        <div style="font-weight:900; color:#334155;">碳權結算價</div>
+        <div style="font-weight:900; color:#0f766e;">$ <span id="settleCarbonPrice">10</span> / 噸</div>
+      </div>
+
+      <div id="settleList" style="margin-top:14px; display:flex; flex-direction:column; gap:10px;"></div>
+
+      <div style="display:flex; gap:10px; margin-top:14px;">
+        <button class="btn" id="btnRestart" style="flex:1;">重新開始</button>
+        <button class="btn primary" id="btnStay" style="flex:1;">結束並返回</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="end-btn" id="btnEnd" style="display:none;">結束遊戲</button>
+</div>
+
+<script>
+(() => {
+  // ---------------------------
+  // Data / constants
+  // ---------------------------
+  const BOARD_DATA = [
+    { name: "起點", type: "go", price: 0 },
+    { name: "阿里山林場", type: "forest", price: 200, yield: 20, carbon: 5 },
+    { name: "機會", type: "event", price: 0 },
+    { name: "七股濕地", type: "ocean", price: 250, yield: 25, carbon: 8 },
+    { name: "碳稅監獄", type: "tax", price: 0 },
+    { name: "台東有機農場", type: "soil", price: 180, yield: 15, carbon: 4 },
+
+    { name: "太陽能電廠", type: "tech", price: 300, yield: 40, carbon: 2 },
+    { name: "命運", type: "event", price: 0 },
+    { name: "碳捕集CCS", type: "tech", price: 400, yield: 10, carbon: 15 },
+    { name: "東沙海草床", type: "ocean", price: 280, yield: 30, carbon: 10 },
+
+    { name: "碳權交易所", type: "safe", price: 0 },
+    { name: "平地造林", type: "forest", price: 220, yield: 22, carbon: 6 },
+    { name: "政策調整", type: "event", price: 0 },
+    { name: "離岸風電", type: "tech", price: 350, yield: 50, carbon: 3 },
+    { name: "淨零達成", type: "safe", price: 0 },
+
+    { name: "生質能廠", type: "tech", price: 320, yield: 35, carbon: 5 },
+    { name: "CBAM關稅", type: "tax", price: 0 },
+    { name: "紅樹林復育", type: "ocean", price: 260, yield: 28, carbon: 9 },
+    { name: "再生農法", type: "soil", price: 200, yield: 18, carbon: 5 },
+    { name: "機會", type: "event", price: 0 }
+  ];
+
+  const LEVEL_CAP = 5;
+  const SETTLE_TURN = 15;
+  const LEVEL_MULT = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5]; // Lv.0~5
+  const UPGRADE_COST_CARBON = 100;
+  const UPGRADE_COST_YIELD  = 120;
+
+  const playerConfigs = [
+    { color: "#2563eb", name: "藍色企業" },
+    { color: "#dc2626", name: "紅色企業" },
+    { color: "#16a34a", name: "綠色企業" },
+    { color: "#d97706", name: "橘色企業" }
+  ];
+
+  // ---------------------------
+  // State
+  // ---------------------------
+  let gameState = "SETUP"; // SETUP / IDLE / MOVING
+  let humanCount = 1;
+
+  const board = BOARD_DATA.map(t => ({
+    ...t,
+    owner: null,
+    level: 0,
+    initCarbon: t.carbon || 0,
+    initYield: t.yield || 0,
+    baseCarbon: t.carbon || 0,
+    baseYield: t.yield || 0
+  }));
+
+  let players = [];
+  let currentPlayer = 0;
+  let diceFace = 1;
+  let diceRolling = false;
+  let logs = [];
+  let globalTemp = 1.1;
+  let turnCount = 1;
+
+  // highlight: store currently lit tiles
+  const highlightSet = new Set();
+  let highlightTimer = null;
+
+  // ---------------------------
+  // DOM refs
+  // ---------------------------
+  const setupOverlay = document.getElementById("setupOverlay");
+  const btnStart = document.getElementById("btnStart");
+  const selHuman = document.getElementById("humanCount");
+  const setupHint = document.getElementById("setupHint");
+
+  const gameLayout = document.getElementById("gameLayout");
+  const boardGrid = document.getElementById("boardGrid");
+  const turnIndicator = document.getElementById("turnIndicator");
+  const roundIndicator = document.getElementById("roundIndicator");
+  const diceEl = document.getElementById("diceDisplay");
+
+  function setDiceFace(face){
+    // reset face classes
+    diceEl.classList.remove("face-1","face-2","face-3","face-4","face-5","face-6");
+    diceEl.classList.add("face-" + face);
+  }
+  const btnRoll = document.getElementById("btnRoll");
+
+  const actionOverlay = document.getElementById("actionOverlay");
+  const actionTitleEl = document.getElementById("actionTitle");
+  const actionDescEl = document.getElementById("actionDesc");
+  const actionButtonsEl = document.getElementById("actionButtons");
+
+  const logBox = document.getElementById("logBox");
+  const tempLabel = document.getElementById("tempLabel");
+  const tempBar = document.getElementById("tempBar");
+  const playerCards = document.getElementById("playerCards");
+  const btnEnd = document.getElementById("btnEnd");
+
+  // ---------------------------
+  // Utilities
+  // ---------------------------
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+  function addLog(msg){
+    logs.unshift(msg);
+    renderLogs();
+  }
+
+  function tileTypeLabel(t){
+    const map = {
+      go: "起點",
+      safe: "安全區",
+      start: "起點", // backward compat
+      forest: "森林",
+      ocean: "海洋",
+      soil: "土壤",
+      tech: "科技",
+      event: "事件",
+      tax: "稅務"
+    };
+    return map[t] || t;
+  }
+
+  function getTileCarbon(tile){
+    const base = tile.baseCarbon || 0;
+    const lv = tile.level || 0;
+    return Math.round(base * LEVEL_MULT[lv]);
+  }
+  function getTileYield(tile){
+    const base = tile.baseYield || 0;
+    const lv = tile.level || 0;
+    return Math.round(base * LEVEL_MULT[lv]);
+  }
+
+  function recomputePlayerCarbon(pid){
+    let total = 0;
+    board.forEach(t => { if (t.owner === pid) total += getTileCarbon(t); });
+    players[pid].carbon = total;
+  }
+
+  function survivors(){
+    return players.filter(p => !p.bankrupt);
+  }
+
+  function setHighlight(idx){
+    highlightSet.clear();
+    highlightSet.add(idx);
+    renderTiles();
+    clearTimeout(highlightTimer);
+    highlightTimer = setTimeout(() => {
+      highlightSet.clear();
+      renderTiles();
+    }, 220);
+  }
+
+  function aiChooseUpgrade(){
+    // 升溫高 -> 更重視 carbon
+    return globalTemp >= 1.5 ? "CARBON" : "YIELD";
+  }
+
+  // ---------------------------
+  // Rendering
+  // ---------------------------
+  const tilePositions = (() => {
+    // 20 tiles around 6x6, same mapping as你原本 Vue 版
+    const pos = [];
+    // top row 0-5
+    for(let i=0;i<6;i++) pos.push({ idx:i, col:i+1, row:1 });
+    // right col 6-9 at col6 row2-5
+    for(let i=0;i<4;i++) pos.push({ idx:6+i, col:6, row:i+2 });
+    // bottom row 10-15 reversed col6-1 row6
+    for(let i=0;i<6;i++) pos.push({ idx:10+i, col:6-i, row:6 });
+    // left col 16-19 col1 row5-2
+    for(let i=0;i<4;i++) pos.push({ idx:16+i, col:1, row:5-i });
+    return pos;
+  })();
+
+  function renderTiles(){
+    // remove old tiles except center panel
+    const center = document.getElementById("centerPanel");
+    boardGrid.innerHTML = "";
+    // inject tiles
+    for(const p of tilePositions){
+      const t = board[p.idx];
+      const tile = document.createElement("div");
+      tile.className = "tile tile-" + t.type + (highlightSet.has(p.idx) ? " highlight" : "");
+      tile.style.gridColumn = p.col;
+      tile.style.gridRow = p.row;
+
+      // type badge
+      const badge = document.createElement("div");
+      badge.className = "type-badge";
+      badge.textContent = tileTypeLabel(t.type);
+      tile.appendChild(badge);
+
+      // title
+      const name = document.createElement("div");
+      name.style.fontWeight = "900";
+      name.style.lineHeight = "1.1";
+      name.textContent = t.name;
+      tile.appendChild(name);
+
+      // price
+      if (t.price){
+        const pr = document.createElement("div");
+        pr.style.fontSize="10px";
+        pr.style.color="#64748b";
+        pr.style.marginTop="4px";
+        pr.textContent = "$" + t.price;
+        tile.appendChild(pr);
+      }
+
+      // owner strip
+      if (t.owner !== null){
+        const strip = document.createElement("div");
+        strip.className = "owner-strip";
+        strip.style.background = players[t.owner]?.color || "#0f172a";
+        tile.appendChild(strip);
+      }
+
+      // lv badge
+      if (t.owner !== null && t.level > 0){
+        const lv = document.createElement("div");
+        lv.className = "lv-badge";
+        lv.textContent = "Lv." + t.level;
+        tile.appendChild(lv);
+      }
+
+      // tokens
+      const tc = document.createElement("div");
+      tc.className="token-container";
+      for(let i=0;i<4;i++){
+        const slot = document.createElement("div");
+        slot.className = "slot p"+i;
+        if (players[i] && players[i].pos === p.idx && !players[i].bankrupt){
+          const flag = document.createElement("div");
+          flag.className="flag";
+          flag.style.setProperty("--c", players[i].color);
+          slot.appendChild(flag);
+        }
+        tc.appendChild(slot);
+      }
+      tile.appendChild(tc);
+
+      boardGrid.appendChild(tile);
+    }
+
+    // re-add center panel
+    boardGrid.appendChild(center);
+  }
+
+  function renderLogs(){
+    logBox.innerHTML = "";
+    for(const l of logs){
+      const d = document.createElement("div");
+      d.textContent = "> " + l;
+      logBox.appendChild(d);
+    }
+  }
+
+  function renderTop(){
+    const p = players[currentPlayer];
+    turnIndicator.innerHTML = "";
+    const dot = document.createElement("div");
+    dot.style.width="10px"; dot.style.height="10px"; dot.style.borderRadius="999px";
+    dot.style.background = p.color;
+    turnIndicator.appendChild(dot);
+
+    const name = document.createElement("div");
+    name.textContent = p.name;
+    turnIndicator.appendChild(name);
+
+    roundIndicator.textContent = "第 " + turnCount + " 輪";
+    setDiceFace(diceFace);
+    diceEl.classList.toggle("rolling", diceRolling);
+
+    // temp
+    tempLabel.textContent = globalTemp.toFixed(2) + "°C";
+    tempLabel.style.color = (globalTemp > 1.5) ? "#dc2626" : "#0f172a";
+    tempBar.style.width = Math.min(100, (globalTemp/2)*100) + "%";
+
+    // roll button
+    btnRoll.disabled = !(gameState === "IDLE" && !players[currentPlayer].isAI);
+    btnRoll.textContent = players[currentPlayer].isAI ? "電腦思考中..." : "擲骰子 🎲";
+    btnRoll.style.opacity = btnRoll.disabled ? ".55" : "1";
+  }
+
+  function renderPlayers(){
+    playerCards.innerHTML = "";
+    players.forEach((p, idx) => {
+      const c = document.createElement("div");
+      c.className = "p-card" + (idx===currentPlayer ? " active" : "");
+      c.style.borderLeft = "6px solid " + p.color;
+
+      const top = document.createElement("div");
+      top.className = "row";
+      const left = document.createElement("div");
+      left.style.fontWeight="900";
+      left.style.color="#334155";
+      left.textContent = (p.isAI ? "🤖 " : "👤 ") + p.name + (p.bankrupt ? "（破產）" : "");
+      const right = document.createElement("div");
+      right.style.width="10px"; right.style.height="10px"; right.style.borderRadius="999px";
+      right.style.background = p.color;
+      top.appendChild(left); top.appendChild(right);
+
+      const grid = document.createElement("div");
+      grid.style.display="grid";
+      grid.style.gridTemplateColumns="1fr 1fr";
+      grid.style.gap="8px";
+      grid.style.marginTop="10px";
+
+      const box1 = document.createElement("div");
+      box1.style.background="#f8fafc"; box1.style.border="1px solid #eef2f7"; box1.style.borderRadius="12px"; box1.style.padding="10px";
+      box1.innerHTML = `<div style="font-size:11px;color:#94a3b8;">資金 (NTD)</div><div style="font-weight:900; font-size:16px; color:${p.money<0?'#dc2626':'#0f172a'}">$${p.money}</div>`;
+      const box2 = document.createElement("div");
+      box2.style.background="#f8fafc"; box2.style.border="1px solid #eef2f7"; box2.style.borderRadius="12px"; box2.style.padding="10px";
+      box2.innerHTML = `<div style="font-size:11px;color:#94a3b8;">碳權 (CORCs)</div><div style="font-weight:900; font-size:16px; color:#16a34a;">${p.carbon} 噸</div>`;
+
+      grid.appendChild(box1); grid.appendChild(box2);
+
+      const foot = document.createElement("div");
+      foot.style.marginTop="10px";
+      foot.style.paddingTop="10px";
+      foot.style.borderTop="1px solid #eef2f7";
+      foot.style.fontSize="11px";
+      foot.style.color="#94a3b8";
+      const assets = board.filter(t=>t.owner===p.id).length;
+      foot.textContent = `資產: ${assets} 筆　｜　位置: ${board[p.pos].name}`;
+
+      c.appendChild(top);
+      c.appendChild(grid);
+      c.appendChild(foot);
+      playerCards.appendChild(c);
+    });
+  }
+
+  function renderAll(){
+    renderTiles();
+    renderLogs();
+    renderTop();
+    renderPlayers();
+  }
+
+  // ---------------------------
+  // Action overlay helpers
+  // ---------------------------
+  function showAction({title, desc, buttons=[]}){
+    actionTitleEl.textContent = title;
+    actionDescEl.innerHTML = desc; // allow preview html
+    actionButtonsEl.innerHTML = "";
+    buttons.forEach(b => {
+      const btn = document.createElement("button");
+      btn.className = "btn " + (b.kind || "blue");
+      btn.textContent = b.text;
+      btn.disabled = !!b.disabled;
+      btn.style.opacity = btn.disabled ? ".55" : "1";
+      btn.onclick = b.onClick;
+      actionButtonsEl.appendChild(btn);
+    });
+    actionOverlay.style.display = "flex";
+  }
+  function hideAction(){
+    actionOverlay.style.display = "none";
+  }
+
+  function buildUpgradePreview(tile){
+    const lvNow = tile.level || 0;
+    const lvNext = Math.min(LEVEL_CAP, lvNow + 1);
+
+    const multNow = LEVEL_MULT[lvNow];
+    const multNext = LEVEL_MULT[lvNext];
+
+    const carbonNow = getTileCarbon(tile);
+    const yieldNow = getTileYield(tile);
+
+    if (lvNow >= LEVEL_CAP){
+      return `
+        <div style="font-weight:900; color:#0f172a; margin-bottom:6px;">已達最高等級 Lv.${LEVEL_CAP}</div>
+        <div style="color:#475569;">目前倍率：<b>×${multNow.toFixed(1)}</b></div>
+        <div style="margin-top:8px;color:#475569;">碳權：<b>${carbonNow}</b> 噸/年　收益：<b>$${yieldNow}</b></div>
+      `;
+    }
+
+    const simCarbon = { ...tile, level: lvNext, baseCarbon: (tile.baseCarbon||0)+1, baseYield: (tile.baseYield||0) };
+    const simYield  = { ...tile, level: lvNext, baseCarbon: (tile.baseCarbon||0), baseYield: (tile.baseYield||0)+5 };
+
+    return `
+      <div style="text-align:left;">
+        <div style="font-weight:900; margin-bottom:6px;">升級前 → 升級後（預覽）</div>
+        <div style="color:#475569;">
+          等級：<b>Lv.${lvNow}</b> → <b>Lv.${lvNext}</b><br>
+          倍率：<b>×${multNow.toFixed(1)}</b> → <b>×${multNext.toFixed(1)}</b>
+        </div>
+
+        <div style="margin-top:10px; padding:10px; border-radius:12px; border:1px solid #e2e8f0; background:#f8fafc;">
+          <div style="font-weight:900; margin-bottom:4px;">目前</div>
+          碳權：<b>${carbonNow}</b> 噸/年<br>
+          收益：<b>$${yieldNow}</b>
+        </div>
+
+        <div style="margin-top:10px; padding:10px; border-radius:12px; border:1px solid #bbf7d0; background:#f0fdf4;">
+          <div style="font-weight:900; color:#166534; margin-bottom:4px;">A：升級碳權（+1 baseCarbon）</div>
+          碳權：<b>${carbonNow}</b> → <b>${getTileCarbon(simCarbon)}</b><br>
+          收益：<b>$${yieldNow}</b> → <b>$${getTileYield(simCarbon)}</b>
+        </div>
+
+        <div style="margin-top:10px; padding:10px; border-radius:12px; border:1px solid #fde68a; background:#fffbeb;">
+          <div style="font-weight:900; color:#92400e; margin-bottom:4px;">B：升級收益（+5 baseYield）</div>
+          碳權：<b>${carbonNow}</b> → <b>${getTileCarbon(simYield)}</b><br>
+          收益：<b>$${yieldNow}</b> → <b>$${getTileYield(simYield)}</b>
+        </div>
+      </div>
+    `;
+  }
+
+  // ---------------------------
+  // Game flow
+  // ---------------------------
+  function startGame(){
+    humanCount = parseInt(selHuman.value, 10);
+    players = [];
+    for(let i=0;i<4;i++){
+      const isHuman = i < humanCount;
+      players.push({
+        id: i,
+        name: isHuman ? `玩家 ${i+1}（您）` : `電腦 AI-${i+1}`,
+        color: playerConfigs[i].color,
+        money: 1500,
+        carbon: 0,
+        pos: 0,
+        isAI: !isHuman,
+        bankrupt: false
+      });
+    }
+    logs = [
+      `遊戲開始！共有 ${humanCount} 位真人與 ${4-humanCount} 位電腦。`,
+      "目標：累積碳權並存活下來！"
+    ];
+
+    setupOverlay.style.display = "none";
+    gameLayout.style.display = "flex";
+    btnEnd.style.display = "block";
+    gameState = "IDLE";
+    currentPlayer = 0;
+    turnCount = 1;
+    diceDisplay = "🎲";
+    globalTemp = 1.1;
+
+    renderAll();
+    checkAI();
+  }
+
+  async function rollDice(){
+    if (gameState !== "IDLE") return;
+    if (players[currentPlayer].bankrupt) return endTurn();
+    gameState = "MOVING";
+    hideAction();
+
+    // dice animation
+    let r = 1;
+    for(let i=0;i<10;i++){
+      r = Math.floor(Math.random()*6)+1;
+      diceFace = r;
+      diceRolling = true;
+      renderTop();
+      await sleep(60);
+    }
+    diceRolling = false;
+    renderTop();
+    await movePlayerStepByStep(r);
+  }
+
+  async function movePlayerStepByStep(steps){
+    const p = players[currentPlayer];
+    let subsidyGiven = false;
+
+    for(let i=1;i<=steps;i++){
+      // move 1 tile
+      const next = (p.pos + 1) % 20;
+      p.pos = next;
+      setHighlight(next);
+      renderAll();
+      await sleep(240);
+
+      // pass-start logic:
+      // 1) 如果途中經過起點（next==0 且 i < steps）=> 代表「超過」起點，給補助金
+      // 2) 如果剛好停在起點（next==0 且 i==steps）=> 不給
+      if (next === 0 && i < steps && !subsidyGiven){
+        subsidyGiven = true;
+        addLog(`${p.name} 超過起點，獲得補助金 $200`);
+        p.money += 200;
+
+        if (p.carbon > 0){
+          const income = p.carbon * 10;
+          addLog(`> 碳權收益: +$${income}`);
+          p.money += income;
+        }
+        renderAll();
+      }
+    }
+
+    // landed -> resolve tile
+    handleTileEvent(p.pos);
+    gameState = "IDLE";
+    renderTop();
+  }
+
+  function triggerRandomEvent(p){
+    const events = [
+      { t: "CBAM 生效", d: "出口成本增加，全體扣除 $50。", m: -50, temp: 0, all: true },
+      { t: "森林大火", d: "全球升溫 0.1°C，自然碳匯受損。", m: 0, temp: 0.1, all: false },
+      { t: "ESG 評鑑獲獎", d: "獲得綠色融資補助 $150。", m: 150, temp: -0.05, all: false },
+      { t: "漂綠指控", d: "部分碳權被認定無效，碳權 -2。", m: 0, temp: 0, carbon: -2, all: false }
+    ];
+    const ev = events[Math.floor(Math.random()*events.length)];
+
+    addLog(`[事件] ${ev.t}`);
+    if (ev.all){
+      players.forEach(pl => { if (!pl.bankrupt) pl.money += ev.m; });
+    } else {
+      p.money += ev.m;
+    }
+    if (ev.temp) globalTemp = Math.max(1.0, globalTemp + ev.temp);
+    if (ev.carbon) p.carbon = Math.max(0, p.carbon + ev.carbon);
+
+    renderAll();
+    showAction({
+      title: ev.t,
+      desc: ev.d,
+      buttons: [{ kind:"blue", text:"確定", onClick: endTurn }]
+    });
+
+    if (p.isAI) setTimeout(endTurn, 900);
+  }
+
+  function handleTileEvent(pos){
+    const tile = board[pos];
+    const p = players[currentPlayer];
+
+    renderAll();
+
+    if (tile.type === "go" || tile.type === "safe" || tile.type === "start"){
+      showAction({
+        title: "安全區域",
+        desc: "稍作休息，整理你的碳資產報表。",
+        buttons: [{ kind:"blue", text:"確定", onClick: endTurn }]
+      });
+      if (p.isAI) setTimeout(endTurn, 900);
+      return;
+    }
+
+    if (["forest","ocean","soil","tech"].includes(tile.type)){
+      if (tile.owner === null){
+        const canBuy = p.money >= tile.price;
+        showAction({
+          title: "發現無主資產",
+          desc: `${tile.name} 開放認購。價格: $${tile.price}，碳權產出: ${getTileCarbon(tile)} 噸/年。`,
+          buttons: [
+            ...(canBuy ? [{ kind:"green", text:`購買 ($${tile.price})`, onClick: () => buyAsset(p, tile) }] : []),
+            { kind: canBuy ? "ghost" : "blue", text: canBuy ? "跳過" : "確定", onClick: endTurn }
+          ]
+        });
+
+        if (p.isAI){
+          if (canBuy) setTimeout(()=>buyAsset(p,tile), 800);
+          else setTimeout(endTurn, 900);
+        }
+        return;
+      }
+
+      // owned by others
+      if (tile.owner !== p.id){
+        const owner = players[tile.owner];
+        if (!owner.bankrupt){
+          const fee = getTileYield(tile);
+          p.money -= fee;
+          owner.money += fee;
+          addLog(`${p.name} 支付 $${fee} 給 ${owner.name}`);
+          renderAll();
+          showAction({
+            title: "支付碳使用費",
+            desc: `這是 ${owner.name} 的資產！支付使用費 $${fee}。`,
+            buttons: [{ kind:"blue", text:"確定", onClick: endTurn }]
+          });
+        } else {
+          showAction({
+            title: "廢棄資產",
+            desc: "擁有者已破產，此地暫時無法收費。",
+            buttons: [{ kind:"blue", text:"確定", onClick: endTurn }]
+          });
+        }
+        if (p.isAI) setTimeout(endTurn, 900);
+        return;
+      }
+
+      // owned by self -> upgrade
+      const atCap = tile.level >= LEVEL_CAP;
+      const prefer = aiChooseUpgrade();
+
+      showAction({
+        title: "資產升級",
+        desc: buildUpgradePreview(tile),
+        buttons: [
+          {
+            kind:"green",
+            text: `升級碳權 (+1 baseCarbon)｜$${UPGRADE_COST_CARBON}`,
+            disabled: atCap || p.money < UPGRADE_COST_CARBON,
+            onClick: () => upgradeCarbon(p, tile)
+          },
+          {
+            kind:"yellow",
+            text: `升級收益 (+5 baseYield)｜$${UPGRADE_COST_YIELD}`,
+            disabled: atCap || p.money < UPGRADE_COST_YIELD,
+            onClick: () => upgradeYield(p, tile)
+          },
+          { kind:"blue", text:"確定", onClick: endTurn }
+        ]
+      });
+
+      if (p.isAI){
+        if (atCap) return setTimeout(endTurn, 900);
+        // try preferred then fallback
+        if (prefer==="CARBON" && p.money>=UPGRADE_COST_CARBON) return setTimeout(()=>upgradeCarbon(p,tile), 900);
+        if (prefer==="YIELD"  && p.money>=UPGRADE_COST_YIELD ) return setTimeout(()=>upgradeYield(p,tile), 900);
+        if (p.money>=UPGRADE_COST_CARBON) return setTimeout(()=>upgradeCarbon(p,tile), 900);
+        if (p.money>=UPGRADE_COST_YIELD ) return setTimeout(()=>upgradeYield(p,tile), 900);
+        return setTimeout(endTurn, 900);
+      }
+      return;
+    }
+
+    if (tile.type === "tax"){
+      const tax = Math.max(0, 150 - (p.carbon * 5));
+      p.money -= tax;
+      addLog(`${p.name} 繳納碳費 $${tax}`);
+      renderAll();
+      showAction({
+        title: tile.name,
+        desc: `碳費徵收！你的碳權抵扣後需繳交 $${tax}。`,
+        buttons: [{ kind:"blue", text:"確定", onClick: endTurn }]
+      });
+      if (p.isAI) setTimeout(endTurn, 900);
+      return;
+    }
+
+    if (tile.type === "event"){
+      return triggerRandomEvent(p);
+    }
+
+    // fallback
+    showAction({ title: tile.name, desc: "（無事件）", buttons:[{kind:"blue", text:"確定", onClick:endTurn}] });
+    if (p.isAI) setTimeout(endTurn, 900);
+  }
+
+  function buyAsset(p, tile){
+    if (tile.owner !== null) return endTurn();
+    if (p.money < tile.price) return endTurn();
+
+    p.money -= tile.price;
+    tile.owner = p.id;
+    tile.level = 0;
+    tile.baseCarbon = tile.initCarbon;
+    tile.baseYield = tile.initYield;
+
+    recomputePlayerCarbon(p.id);
+    addLog(`${p.name} 購買了 ${tile.name}（碳權 +${getTileCarbon(tile)}）`);
+    renderAll();
+    endTurn();
+  }
+
+  function upgradeCarbon(p, tile){
+    if (tile.level >= LEVEL_CAP) { addLog(`${tile.name} 已達最高等級 Lv.${LEVEL_CAP}`); return endTurn(); }
+    if (p.money < UPGRADE_COST_CARBON) { addLog(`${p.name} 資金不足，無法升級碳權`); return endTurn(); }
+
+    p.money -= UPGRADE_COST_CARBON;
+    tile.level += 1;
+    tile.baseCarbon += 1;
+
+    recomputePlayerCarbon(p.id);
+    addLog(`${p.name} 升級 ${tile.name} → Lv.${tile.level}（碳權有效值：${getTileCarbon(tile)}）`);
+    renderAll();
+    endTurn();
+  }
+
+  function upgradeYield(p, tile){
+    if (tile.level >= LEVEL_CAP) { addLog(`${tile.name} 已達最高等級 Lv.${LEVEL_CAP}`); return endTurn(); }
+    if (p.money < UPGRADE_COST_YIELD) { addLog(`${p.name} 資金不足，無法升級收益`); return endTurn(); }
+
+    p.money -= UPGRADE_COST_YIELD;
+    tile.level += 1;
+    tile.baseYield += 5;
+
+    recomputePlayerCarbon(p.id);
+    addLog(`${p.name} 升級 ${tile.name} → Lv.${tile.level}（收益有效值：$${getTileYield(tile)}｜碳權有效值：${getTileCarbon(tile)}）`);
+    renderAll();
+    endTurn();
+  }
+
+  function endTurn(){
+    hideAction();
+
+    const p = players[currentPlayer];
+
+    // bankruptcy
+    if (p.money < 0 && !p.bankrupt){
+      p.bankrupt = true;
+      p.carbon = 0;
+      board.forEach(t => {
+        if (t.owner === p.id){
+          t.owner = null;
+          t.level = 0;
+          t.baseCarbon = t.initCarbon;
+          t.baseYield = t.initYield;
+        }
+      });
+      addLog(`❌ ${p.name} 破產了！資產充公。`);
+    }
+
+    // global failure
+    if (globalTemp >= 2.0){
+      alert("⚠️ 警告：全球升溫突破 2°C，氣候崩潰！\n\n遊戲結束，所有人都是輸家。");
+      location.reload();
+      return;
+    }
+
+    // winner
+    const live = survivors();
+    if (live.length === 1){
+      alert(`🏆 恭喜！ ${live[0].name} 是最後的贏家！\n\n成功兼顧了獲利與永續經營。`);
+      location.reload();
+      return;
+    }
+
+    // next player (skip bankrupt)
+    let next = (currentPlayer + 1) % 4;
+    while (players[next].bankrupt) next = (next + 1) % 4;
+    currentPlayer = next;
+    if (next === 0) {
+      // 完成一整輪：若已到達結算輪數，直接結算（不再進入下一輪）
+      if (turnCount === SETTLE_TURN) {
+        openSettlement();
+        return;
+      }
+      turnCount += 1;
+    }
+
+    gameState = "IDLE";
+    renderAll();
+    checkAI();
+  }
+
+  
+  function calcCarbonPrice(){
+    return Math.max(0, 10 + (globalTemp - 1.0) * 20);
+  }
+  function calcRiskPenalty(){
+    return (globalTemp > 1.5) ? Math.round(100 * (globalTemp - 1.5)) : 0;
+  }
+  function calcAssetValue(pid){
+    let sum = 0;
+    for(const t of board){
+      if (t.owner === pid){
+        const lv = t.level || 0;
+        const factor = 1 + 0.2 * lv;
+        sum += Math.round((t.price || 0) * factor);
+      }
+    }
+    return sum;
+  }
+
+  function openSettlement(){
+    gameState = "SETTLED";
+    btnRoll.disabled = true;
+
+    const carbonPrice = calcCarbonPrice();
+    const risk = calcRiskPenalty();
+
+    const rank = players.map(p => {
+      const assetValue = p.bankrupt ? 0 : calcAssetValue(p.id);
+      const carbonValue = p.bankrupt ? 0 : Math.round((p.carbon || 0) * carbonPrice);
+      const riskPenalty = p.bankrupt ? 0 : risk;
+      const total = p.bankrupt ? -999999 : Math.round((p.money || 0) + assetValue + carbonValue - riskPenalty);
+      return {
+        id: p.id,
+        name: p.name,
+        color: p.color,
+        bankrupt: p.bankrupt,
+        money: p.money,
+        assetValue,
+        carbonValue,
+        riskPenalty,
+        total
+      };
+    }).sort((a,b)=>b.total-a.total);
+
+    // render
+    const overlay = document.getElementById("settlementOverlay");
+    const list = document.getElementById("settleList");
+    const cp = document.getElementById("settleCarbonPrice");
+    const sub = document.getElementById("settleSub");
+    cp.textContent = `${Math.round(carbonPrice)}`;
+    sub.textContent = `第 ${SETTLE_TURN} 輪結算`;
+
+    list.innerHTML = "";
+    rank.forEach((r, idx) => {
+      const row = document.createElement("div");
+      row.className = "settle-item";
+      row.style.animationDelay = (idx * 0.08) + "s";
+      row.style.border = "1px solid #e2e8f0";
+      row.style.borderRadius = "14px";
+      row.style.padding = "12px";
+      row.style.display = "flex";
+      row.style.alignItems = "center";
+      row.style.justifyContent = "space-between";
+      row.style.gap = "10px";
+
+      const left = document.createElement("div");
+      left.style.display="flex";
+      left.style.alignItems="center";
+      left.style.gap="10px";
+
+      const medal = document.createElement("div");
+      if (idx === 0){
+        medal.className = "medal gold-medal";
+        medal.textContent = "🥇";
+      } else if (idx === 1){
+        medal.className = "medal silver-medal";
+        medal.textContent = "🥈";
+      } else if (idx === 2){
+        medal.className = "medal bronze-medal";
+        medal.textContent = "🥉";
+      } else {
+        medal.className = "medal";
+        medal.style.background="#f1f5f9";
+        medal.style.color="#64748b";
+        medal.textContent = String(idx+1);
+      }
+
+      const nameBox = document.createElement("div");
+      const nm = document.createElement("div");
+      nm.style.fontWeight="900";
+      nm.style.color="#0f172a";
+      nm.style.display="flex";
+      nm.style.alignItems="center";
+      nm.style.gap="8px";
+      const dot = document.createElement("span");
+      dot.style.display="inline-block";
+      dot.style.width="10px";
+      dot.style.height="10px";
+      dot.style.borderRadius="999px";
+      dot.style.background=r.color;
+      nm.appendChild(dot);
+      nm.appendChild(document.createTextNode(r.name + (r.bankrupt ? "（破產）" : "")));
+      nameBox.appendChild(nm);
+
+      const detail = document.createElement("div");
+      detail.style.fontSize="11px";
+      detail.style.color="#64748b";
+      detail.textContent = `現金 $${r.money} ｜資產 $${r.assetValue} ｜碳權價值 $${r.carbonValue} ｜風險 -$${r.riskPenalty}`;
+      nameBox.appendChild(detail);
+
+      left.appendChild(medal);
+      left.appendChild(nameBox);
+
+      const right = document.createElement("div");
+      right.style.textAlign="right";
+      const lab = document.createElement("div");
+      lab.textContent = "總分";
+      lab.style.fontSize="11px";
+      lab.style.color="#94a3b8";
+      const tot = document.createElement("div");
+      tot.textContent = "$" + r.total;
+      tot.style.fontSize="24px";
+      tot.style.fontWeight="900";
+      tot.style.color="#0f172a";
+      right.appendChild(lab); right.appendChild(tot);
+
+      row.appendChild(left); row.appendChild(right);
+      list.appendChild(row);
+    });
+
+    overlay.style.display = "flex";
+    addLog(`🏁 第 ${SETTLE_TURN} 輪結算：已產生最終排名`);
+    renderAll();
+  }
+
+  function closeSettlement(){
+    document.getElementById("settlementOverlay").style.display = "none";
+  }
+function checkAI(){
+    const p = players[currentPlayer];
+    if (p && p.isAI && !p.bankrupt){
+      setTimeout(rollDice, 900);
+    }
+  }
+
+  function endGameImmediately(){
+    const ok = confirm("⚠️ 確定要結束遊戲嗎？\n\n目前進度將不會保留。");
+    if (ok) location.reload();
+  }
+
+  // ---------------------------
+  // Wire events
+  // ---------------------------
+  btnStart.addEventListener("click", () => {
+    try{
+      startGame();
+    }catch(err){
+      console.error(err);
+      setupHint.textContent = "❌ 初始化失敗，請按 F12 → Console 把錯誤貼給我。";
+      alert("發生錯誤：開始遊戲初始化失敗。\n\n請按 F12 → Console 查看錯誤訊息。");
+    }
+  });
+
+  btnRoll.addEventListener("click", () => rollDice());
+  const btnRestart = document.getElementById("btnRestart");
+  const btnStay = document.getElementById("btnStay");
+  if (btnRestart) btnRestart.addEventListener("click", () => location.reload());
+  if (btnStay) btnStay.addEventListener("click", () => closeSettlement());
+
+  btnEnd.addEventListener("click", () => endGameImmediately());
+
+  // initial render for board (so you see frame under modal)
+  // Build empty players for rendering owner strip safety
+  players = playerConfigs.map((c,i)=>({id:i,name:c.name,color:c.color,money:0,carbon:0,pos:0,isAI:true,bankrupt:false}));
+  renderAll();
+
+})();
+</script>
+</body>
+</html>
